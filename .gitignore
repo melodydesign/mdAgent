@@ -1,0 +1,77 @@
+# Environment & Secrets
+.env
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+
+# Local user data, sessions & credentials
+data/
+active_session_state.json
+
+# Browser runtime data & media
+playwright-data/
+.tilda_browser_data/
+screenshots/
+videos/
+
+# Temporary, scratch & experiment files
+scratch*
+scratch/
+
+# Agent IDE meta & planning artifacts
+.agents/
+artifacts/
+.gemini/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+.npm
+.eslintcache
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
