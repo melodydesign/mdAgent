@@ -69,37 +69,55 @@ export default function LogDrawer({ logs, onClearLogs }) {
 
   return (
     <div style={{
-      borderTop: '1px solid var(--border-subtle)',
-      background: 'var(--bg-surface)',
+      background: 'rgba(255, 255, 255, 0.65)',
+      backdropFilter: 'blur(24px)',
+      WebkitBackdropFilter: 'blur(24px)',
+      border: '1px solid rgba(255, 255, 255, 0.8)',
+      borderRadius: '14px',
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
       transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       display: 'flex',
       flexDirection: 'column',
-      height: isOpen ? '220px' : '38px',
-      zIndex: 50
+      height: isOpen ? '220px' : '40px',
+      overflow: 'hidden',
+      zIndex: 50,
+      flexShrink: 0
     }}>
       {/* Шапка консоли логов */}
       <div 
         style={{
-          height: '38px',
+          height: '40px',
           padding: '0 16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           cursor: 'pointer',
-          background: 'rgba(10, 13, 20, 0.6)',
+          background: 'transparent',
           userSelect: 'none'
         }}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-          <Terminal size={15} color="var(--accent-secondary)" />
-          <span style={{ fontSize: '12px', fontWeight: '600' }}>Системный журнал</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+          <div style={{
+            width: '24px',
+            height: '24px',
+            borderRadius: '6px',
+            background: '#EDE9FE',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#7C3AED'
+          }}>
+            <Terminal size={13} />
+          </div>
+          <span style={{ fontSize: '12px', fontWeight: '600', color: '#1F2937' }}>Системный журнал</span>
           <span style={{
             fontSize: '11px',
-            background: 'rgba(255, 255, 255, 0.06)',
-            padding: '1px 6px',
+            background: 'rgba(124, 58, 237, 0.08)',
+            padding: '1px 7px',
             borderRadius: '10px',
-            color: 'var(--text-muted)'
+            color: '#7C3AED',
+            fontWeight: '600'
           }}>
             {logs.length}
           </span>
@@ -107,13 +125,12 @@ export default function LogDrawer({ logs, onClearLogs }) {
           {/* Превью последнего лога в свернутом виде */}
           {!isOpen && lastLog && (
             <span style={{
-              fontSize: '11px',
-              color: lastLog.level === 'error' ? 'var(--accent-danger)' : 'var(--text-muted)',
+              fontSize: '11.5px',
+              color: lastLog.level === 'error' ? '#EF4444' : '#6B7280',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              marginLeft: '10px',
-              fontFamily: 'var(--font-mono)'
+              marginLeft: '8px'
             }}>
               [{lastLog.time}] {lastLog.message}
             </span>
@@ -130,15 +147,16 @@ export default function LogDrawer({ logs, onClearLogs }) {
                     key={lvl}
                     onClick={() => setFilter(lvl)}
                     style={{
-                      padding: '2px 8px',
+                      padding: '3px 8px',
                       fontSize: '10px',
-                      borderRadius: '4px',
+                      borderRadius: '6px',
                       border: 'none',
                       cursor: 'pointer',
-                      background: filter === lvl ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
-                      color: filter === lvl ? '#a5b4fc' : 'var(--text-muted)',
+                      background: filter === lvl ? '#EDE9FE' : 'rgba(0, 0, 0, 0.04)',
+                      color: filter === lvl ? '#7C3AED' : '#6B7280',
                       textTransform: 'uppercase',
-                      fontWeight: '600'
+                      fontWeight: '600',
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     {lvl === 'all' ? 'Все' : lvl}
@@ -148,19 +166,21 @@ export default function LogDrawer({ logs, onClearLogs }) {
 
               {/* Копирование */}
               <button
-                className="btn btn-icon"
+                type="button"
+                className="figma-icon-action-btn"
                 onClick={copyLogs}
-                style={{ padding: '4px' }}
+                style={{ width: '26px', height: '26px', borderRadius: '6px' }}
                 title="Скопировать логи"
               >
-                {copied ? <Check size={13} color="var(--accent-success)" /> : <Copy size={13} />}
+                {copied ? <Check size={13} color="#10B981" /> : <Copy size={13} />}
               </button>
 
               {/* Очистка */}
               <button
-                className="btn btn-icon"
+                type="button"
+                className="figma-icon-action-btn"
                 onClick={onClearLogs}
-                style={{ padding: '4px' }}
+                style={{ width: '26px', height: '26px', borderRadius: '6px' }}
                 title="Очистить логи"
               >
                 <Trash2 size={13} />
@@ -168,13 +188,17 @@ export default function LogDrawer({ logs, onClearLogs }) {
             </>
           )}
 
-          <button 
-            className="btn btn-icon"
-            onClick={() => setIsOpen(!isOpen)}
-            style={{ padding: '4px' }}
-          >
+          <div style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#6B7280'
+          }}>
             {isOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          </button>
+          </div>
         </div>
       </div>
 
@@ -183,38 +207,42 @@ export default function LogDrawer({ logs, onClearLogs }) {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '8px 16px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '11px',
+          padding: '10px 16px',
+          fontSize: '11.5px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px',
-          background: 'var(--bg-base)'
+          gap: '5px',
+          background: 'rgba(255, 255, 255, 0.55)',
+          borderTop: '1px solid rgba(0, 0, 0, 0.05)'
         }}>
           {filteredLogs.length === 0 ? (
-            <div style={{ color: 'var(--text-faint)', padding: '10px 0' }}>
+            <div style={{ color: '#9CA3AF', padding: '10px 0', textAlign: 'center' }}>
               Нет записей в журнале.
             </div>
           ) : (
             filteredLogs.map((log, idx) => {
-              let color = 'var(--text-muted)';
-              if (log.level === 'error') color = 'var(--accent-danger)';
-              if (log.level === 'success') color = 'var(--accent-success)';
-              if (log.level === 'warning') color = 'var(--accent-warning)';
+              let tagBg = '#F3F4F6';
+              let tagColor = '#6B7280';
+              if (log.level === 'error') { tagBg = '#FEE2E2'; tagColor = '#EF4444'; }
+              if (log.level === 'success') { tagBg = '#DCFCE7'; tagColor = '#15803D'; }
+              if (log.level === 'warning') { tagBg = '#FEF3C7'; tagColor = '#D97706'; }
 
               return (
-                <div key={idx} style={{ display: 'flex', gap: '8px', lineHeight: '1.4' }}>
-                  <span style={{ color: 'var(--text-faint)', flexShrink: 0 }}>[{log.time}]</span>
+                <div key={idx} style={{ display: 'flex', alignItems: 'baseline', gap: '8px', lineHeight: '1.45' }}>
+                  <span style={{ color: '#9CA3AF', fontSize: '10.5px', flexShrink: 0 }}>[{log.time}]</span>
                   <span style={{
-                    color,
+                    background: tagBg,
+                    color: tagColor,
+                    fontSize: '10px',
+                    padding: '1px 5px',
+                    borderRadius: '4px',
                     textTransform: 'uppercase',
                     fontWeight: '600',
-                    width: '55px',
                     flexShrink: 0
                   }}>
                     {log.level}
                   </span>
-                  <span style={{ color: 'var(--text-main)', wordBreak: 'break-all' }}>
+                  <span style={{ color: '#1F2937', wordBreak: 'break-all' }}>
                     {log.message}
                   </span>
                 </div>

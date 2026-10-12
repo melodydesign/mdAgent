@@ -139,7 +139,7 @@ function PlanConfirmationCard({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <CheckCircle2 size={13} color="var(--accent-success)" />
-          <span style={{ fontSize: '11.5px', fontWeight: '500', color: '#cbd5e1' }}>
+          <span style={{ fontSize: '11.5px', fontWeight: '600', color: '#1E293B' }}>
             План ({formatStepsCount(activeCount)}) утверждён
           </span>
         </div>
@@ -161,7 +161,7 @@ function PlanConfirmationCard({
       <div className="plan-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Sparkles size={13} color="var(--accent-primary)" />
-          <span style={{ fontSize: '12px', fontWeight: '600', color: '#f1f5f9' }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: '#111827' }}>
             План задачи • {formatStepsCount(activeCount)}
           </span>
         </div>
@@ -347,7 +347,7 @@ function PlanConfirmationCard({
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-purple"
               onClick={handleConfirmPlan}
               disabled={isBusy || activeCount === 0}
               style={{
@@ -362,15 +362,13 @@ function PlanConfirmationCard({
             </button>
             <button
               type="button"
-              className="btn"
+              className="btn btn-secondary"
               onClick={handleCancelPlan}
               disabled={isBusy}
               style={{
                 fontSize: '11.5px',
                 padding: '4px 10px',
-                height: '28px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                color: 'var(--text-muted)'
+                height: '28px'
               }}
             >
               Отмена
@@ -382,6 +380,14 @@ function PlanConfirmationCard({
   );
 }
 
+const AI_MODELS = [
+  { id: 'hydraai', provider: 'hydraai', label: 'GPT 5.6 Lina' },
+  { id: 'gemini-3.8-flash', provider: 'gemini', label: 'Gemini 3.8 Flash' },
+  { id: 'gemini-3.7-flash', provider: 'gemini', label: 'Gemini 3.7 Flash' },
+  { id: 'gemini-3.6-flash', provider: 'gemini', label: 'Gemini 3.6 Flash' },
+  { id: 'gemini-3.5-flash', provider: 'gemini', label: 'Gemini 3.5 Flash' },
+];
+
 export default function ChatPanel({
   messages,
   isBusy,
@@ -390,12 +396,46 @@ export default function ChatPanel({
   onConfirmPlan,
   onCancelPlan,
   onOpenDialogs,
-  activeSessionTitle
+  activeSessionTitle,
+  activeProvider = 'hydraai',
+  onSaveProvider,
+  templatePrompt = '',
+  onClearTemplatePrompt,
+  onNewChat
 }) {
   const [attachedImage, setAttachedImage] = useState(null);
   const [isAnnotatorOpen, setIsAnnotatorOpen] = useState(false);
   const [viewingImage, setViewingImage] = useState(null);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(() => {
+    return activeProvider === 'hydraai' ? AI_MODELS[0] : AI_MODELS[1];
+  });
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (activeProvider === 'hydraai') {
+      setSelectedModel(AI_MODELS[0]);
+    } else if (selectedModel.provider !== 'gemini') {
+      setSelectedModel(AI_MODELS[1]);
+    }
+  }, [activeProvider]);
+
+  useEffect(() => {
+    if (!modelMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.figma-model-container')) {
+        setModelMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [modelMenuOpen]);
+
+  const handleSelectModel = (m) => {
+    setSelectedModel(m);
+    setModelMenuOpen(false);
+    onSaveProvider?.(m.provider);
+  };
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
@@ -435,6 +475,17 @@ export default function ChatPanel({
   const [copiedId, setCopiedId] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+
+  useEffect(() => {
+    if (templatePrompt) {
+      setInputText(templatePrompt);
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        setTimeout(() => adjustTextareaHeight(textareaRef.current), 50);
+      }
+      onClearTemplatePrompt?.();
+    }
+  }, [templatePrompt]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -681,7 +732,7 @@ export default function ChatPanel({
                 Да, опубликовать
               </button>
               <button
-                className="btn"
+                className="btn btn-secondary"
                 style={{ fontSize: '12px', padding: '6px 12px' }}
                 onClick={() => onSendMessage('Нет, оставь черновик')}
               >
@@ -727,82 +778,52 @@ export default function ChatPanel({
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      background: 'var(--bg-surface)',
-      borderRight: '1px solid var(--border-subtle)',
       position: 'relative'
     }}>
-      {/* Шапка чата */}
-      <div style={{
-        padding: '14px 16px',
-        borderBottom: '1px solid var(--border-subtle)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'rgba(17, 23, 38, 0.5)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-          <button
-            type="button"
-            className="btn btn-icon"
+      {/* Шапка сайдбара Figma */}
+      <div className="figma-sidebar-header">
+        <div className="figma-brand-group">
+          <div className="figma-brand-icon">
+            <Sparkles size={16} />
+          </div>
+          <span className="figma-brand-title">mdAgent</span>
+          <button 
+            type="button" 
+            className="figma-chats-badge"
             onClick={onOpenDialogs}
-            title="Список диалогов и логинов Tilda"
-            style={{ padding: '4px', color: 'var(--accent-primary)', flexShrink: 0 }}
+            title="Открыть список диалогов"
           >
-            <MessageSquare size={16} />
+            <span>Чаты</span>
+            <ChevronDown size={13} />
           </button>
-          <span style={{
-            fontWeight: '600',
-            fontSize: '13.5px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>
-            {activeSessionTitle || 'Интеллектуальный диалог'}
-          </span>
-          <span style={{
-            fontSize: '11px',
-            background: 'rgba(255, 255, 255, 0.06)',
-            padding: '2px 6px',
-            borderRadius: '10px',
-            color: 'var(--text-muted)',
-            flexShrink: 0
-          }}>
-            {messages.length}
-          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+        {messages.length > 0 && (
           <button
             type="button"
             className="btn btn-icon"
-            onClick={onOpenDialogs}
-            title="Управление диалогами"
-            style={{ padding: '6px', color: 'var(--text-muted)' }}
+            onClick={onClearHistory}
+            title="Очистить историю диалога"
+            style={{ padding: '6px', color: 'var(--text-faint)' }}
           >
-            <MessageSquare size={14} />
+            <Trash2 size={15} />
           </button>
-          {messages.length > 0 && (
-            <button
-              className="btn btn-icon"
-              onClick={onClearHistory}
-              title="Очистить историю диалога"
-              style={{ padding: '6px', color: 'var(--text-faint)' }}
-            >
-              <Trash2 size={15} />
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
+      {/* Кнопка Новый чат */}
+      <button 
+        type="button" 
+        className="figma-new-chat-btn"
+        onClick={onNewChat || onOpenDialogs}
+        title="Начать новый диалог"
+      >
+        <Plus size={15} />
+        <span>Новый чат</span>
+      </button>
+
       {/* Лента сообщений */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '14px'
-      }}>
+      <div className="figma-chat-messages">
         {messages.length === 0 ? (
           <div style={{
             flex: 1,
@@ -850,7 +871,7 @@ export default function ChatPanel({
                     width: '28px',
                     height: '28px',
                     borderRadius: '8px',
-                    background: isError ? 'rgba(239, 68, 68, 0.2)' : 'rgba(99, 102, 241, 0.2)',
+                    background: isError ? '#FEE2E2' : '#EDE9FE',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -859,9 +880,9 @@ export default function ChatPanel({
                     userSelect: 'none'
                   }}>
                     {isError ? (
-                      <AlertCircle size={15} color="var(--accent-danger)" />
+                      <AlertCircle size={15} color="#EF4444" />
                     ) : (
-                      <Bot size={15} color="var(--accent-primary)" />
+                      <Bot size={15} color="#7C3AED" />
                     )}
                   </div>
                 )}
@@ -872,17 +893,17 @@ export default function ChatPanel({
                     padding: '10px 14px',
                     borderRadius: isUser ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
                     background: isUser
-                      ? 'linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover))'
+                      ? '#8B5CF6'
                       : isError 
-                        ? 'rgba(239, 68, 68, 0.1)' 
-                        : 'var(--bg-surface-elevated)',
+                        ? '#FEF2F2' 
+                        : '#ffffff',
                     border: isError
-                      ? '1px solid rgba(239, 68, 68, 0.3)'
+                      ? '1px solid #FCA5A5'
                       : isUser 
                         ? 'none' 
-                        : '1px solid var(--border-subtle)',
-                    color: 'var(--text-main)',
-                    boxShadow: 'var(--shadow-sm)',
+                        : '1px solid rgba(0, 0, 0, 0.06)',
+                    color: isUser ? '#ffffff' : '#111827',
+                    boxShadow: isUser ? '0 2px 8px rgba(139, 92, 246, 0.25)' : '0 2px 8px rgba(0, 0, 0, 0.03)',
                     wordBreak: 'break-word',
                     overflowWrap: 'anywhere'
                   }}
@@ -989,11 +1010,10 @@ export default function ChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Поле ввода с плашкой цитирования над ним */}
+      {/* Поле ввода внизу сайдбара */}
       <div style={{
-        padding: '12px 16px',
-        borderTop: '1px solid var(--border-subtle)',
-        background: 'rgba(17, 23, 38, 0.95)'
+        padding: '0',
+        background: 'transparent'
       }}>
         {/* Плашка цитирования при ответе */}
         {replyingTo && (
@@ -1049,76 +1069,83 @@ export default function ChatPanel({
           </div>
         )}
 
-        <form 
-          onSubmit={handleSubmit} 
-          style={{ 
-            display: 'flex', 
-            alignItems: 'flex-end', 
-            gap: '8px',
-            background: 'var(--bg-base)',
-            borderRadius: 'var(--radius-md)',
-            padding: '6px 10px',
-            border: '1px solid rgba(255, 255, 255, 0.05)'
-          }}
-        >
-          <button
-            type="button"
-            className="btn btn-icon"
-            onClick={() => fileInputRef.current?.click()}
-            title="Прикрепить фото / скриншот (или вставьте через Ctrl+V)"
-            style={{ padding: '6px', color: attachedImage ? 'var(--accent-primary)' : 'var(--text-muted)', height: '32px' }}
-          >
-            <Paperclip size={15} />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleFileSelect}
-          />
-          <textarea
-            ref={textareaRef}
-            onPaste={handlePaste}
-            rows={1}
-            value={inputText}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={isBusy ? 'Агент выполняет задачу...' : 'Введите команду...'}
-            disabled={isBusy}
-            style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              boxShadow: 'none',
-              color: 'var(--text-main)',
-              fontSize: '13px',
-              lineHeight: '1.4',
-              padding: '6px 4px',
-              resize: 'none',
-              fontFamily: 'inherit',
-              minHeight: '28px',
-              maxHeight: '220px',
-              overflowY: 'hidden'
-            }}
-          />
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={!inputText.trim() || isBusy}
-            style={{ 
-              padding: '7px 12px', 
-              borderRadius: 'var(--radius-sm)', 
-              height: '32px',
-              flexShrink: 0,
-              outline: 'none',
-              boxShadow: 'none'
-            }}
-          >
-            <Send size={14} />
-          </button>
-        </form>
+        {/* Карточка ввода в стиле Figma */}
+        <div className="figma-input-wrapper">
+          <div className="figma-input-card">
+            <textarea
+              ref={textareaRef}
+              className="figma-input-textarea"
+              onPaste={handlePaste}
+              rows={1}
+              value={inputText}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder={isBusy ? 'Агент выполняет задачу...' : 'Введите задачу агенту mdAgent...'}
+              disabled={isBusy}
+            />
+
+            <div className="figma-input-bottom-bar">
+              {/* Селектор моделей ИИ */}
+              <div className="figma-model-container">
+                <button
+                  type="button"
+                  className="figma-model-selector-btn"
+                  onClick={() => setModelMenuOpen(!modelMenuOpen)}
+                  title="Выбор активной модели ИИ"
+                >
+                  <Sparkles size={12} />
+                  <span>{selectedModel?.label || 'GPT 5.6 Lina'}</span>
+                  <ChevronDown size={11} />
+                </button>
+
+                {modelMenuOpen && (
+                  <div className="figma-model-dropdown">
+                    {AI_MODELS.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className={`figma-model-option ${selectedModel?.id === m.id ? 'active' : ''}`}
+                        onClick={() => handleSelectModel(m)}
+                      >
+                        <span>{m.label}</span>
+                        {selectedModel?.id === m.id && <Check size={13} color="#7C3AED" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Правые действия: Скрепка и 3D-сфера отправки */}
+              <div className="figma-input-actions-right">
+                <button
+                  type="button"
+                  className="figma-icon-action-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Прикрепить скриншот или макет"
+                >
+                  <Paperclip size={15} color={attachedImage ? 'var(--color-purple-primary)' : 'var(--text-muted)'} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleFileSelect}
+                />
+
+                <button
+                  type="button"
+                  className="purple-orb-btn"
+                  onClick={handleSubmit}
+                  disabled={(!inputText.trim() && !attachedImage) || isBusy}
+                  title="Отправить команду (Enter)"
+                >
+                  <ArrowUp size={16} strokeWidth={2.6} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Модалка аннотации и рисования на скриншоте */}

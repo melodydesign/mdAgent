@@ -137,17 +137,16 @@ export default function DialogsPanel({ activeSessionId, onSelectSession, onBackT
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      background: 'var(--bg-surface)',
-      borderRight: '1px solid var(--border-subtle)'
+      background: 'transparent'
     }}>
       {/* Шапка списка диалогов */}
       <div style={{
         padding: '14px 16px',
-        borderBottom: '1px solid var(--border-subtle)',
+        borderBottom: '1px solid #F3F4F6',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        background: 'rgba(17, 23, 38, 0.6)'
+        background: 'rgba(255, 255, 255, 0.6)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
@@ -159,13 +158,14 @@ export default function DialogsPanel({ activeSessionId, onSelectSession, onBackT
           >
             <ArrowLeft size={16} />
           </button>
-          <span style={{ fontWeight: '600', fontSize: '14px' }}>Список диалогов</span>
+          <span style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>Список диалогов</span>
           <span style={{
             fontSize: '11px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            padding: '2px 6px',
+            background: '#EDE9FE',
+            padding: '2px 7px',
             borderRadius: '10px',
-            color: 'var(--text-muted)'
+            color: '#6D28D9',
+            fontWeight: '600'
           }}>
             {sessions.length}
           </span>
@@ -190,15 +190,16 @@ export default function DialogsPanel({ activeSessionId, onSelectSession, onBackT
         <form onSubmit={handleCreate} style={{
           margin: '12px 14px',
           padding: '14px',
-          background: 'var(--bg-surface-elevated)',
-          border: '1px solid var(--border-glow)',
+          background: '#ffffff',
+          border: '1px solid #DDD6FE',
           borderRadius: 'var(--radius-md)',
+          boxShadow: '0 4px 14px rgba(124, 58, 237, 0.08)',
           display: 'flex',
           flexDirection: 'column',
           gap: '10px'
         }}>
-          <div style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Plus size={14} color="var(--accent-primary)" />
+          <div style={{ fontWeight: '700', fontSize: '13px', color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Plus size={14} color="#7C3AED" />
             Новый диалог
           </div>
 
@@ -467,19 +468,21 @@ export default function DialogsPanel({ activeSessionId, onSelectSession, onBackT
                           gap: '6px'
                         }}
                       >
-                        <span style={{ fontSize: '11px', color: '#fca5a5' }}>Удалить этот диалог?</span>
+                        <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: '500' }}>Удалить этот диалог?</span>
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button
                             type="button"
+                            className="btn btn-secondary"
                             onClick={() => setDeletingId(null)}
-                            style={{ padding: '2px 6px', fontSize: '10.5px', background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}
+                            style={{ padding: '2px 8px', fontSize: '10.5px' }}
                           >
                             Нет
                           </button>
                           <button
                             type="button"
+                            className="btn btn-danger"
                             onClick={(e) => handleDelete(s.id, e)}
-                            style={{ padding: '2px 6px', fontSize: '10.5px', background: 'var(--accent-danger)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}
+                            style={{ padding: '2px 8px', fontSize: '10.5px' }}
                           >
                             Да, удалить
                           </button>

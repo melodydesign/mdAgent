@@ -6,6 +6,7 @@ import LiveViewport from './components/LiveViewport';
 import LogDrawer from './components/LogDrawer';
 import SettingsModal from './components/SettingsModal';
 import MemoryModal from './components/MemoryModal';
+import TildaCredentialsModal from './components/TildaCredentialsModal';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -91,6 +92,8 @@ function AppContent() {
   // Модальные окна
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [tildaModalOpen, setTildaModalOpen] = useState(false);
+  const [templatePrompt, setTemplatePrompt] = useState('');
   const [isStartingSession, setIsStartingSession] = useState(false);
   const isStartingRef = useRef(false);
   const startTimeoutRef = useRef(null);
@@ -459,16 +462,60 @@ function AppContent() {
       if (data.ok) {
         setActiveProvider(provider);
         try { localStorage.setItem('mdagent_active_provider', provider); } catch (_) {}
-        addLog('success', `Активный AI изменен на: ${provider === 'hydraai' ? 'HydraAI (GPT-5.6 Luna)' : 'Google Gemini (Каскад)'}`);
+        addLog('success', `Активная модель изменена на: ${provider === 'hydraai' ? 'GPT 5.6 Lina' : 'Google Gemini 3.5+'}`);
       }
     } catch (e) {
       addLog('error', `Ошибка смены провайдера: ${e.message}`);
     }
   };
 
+  const handleSaveTildaCredentials = async (email, password) => {
+    try {
+      const res = await fetch(`/api/chat/sessions/${activeSessionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tilda_email: email,
+          tilda_password: password
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.session) {
+          setActiveSession(data.session);
+        }
+        addLog('success', 'Учётные данные Tilda сохранены');
+      }
+    } catch (e) {
+      addLog('error', `Ошибка сохранения данных Tilda: ${e.message}`);
+    }
+  };
+
+  const handleNewChat = async () => {
+    try {
+      const res = await fetch('/api/chat/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Новый диалог' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.session) {
+          setActiveSessionId(data.session.id);
+          setActiveSession(data.session);
+          setMessages([]);
+          setViewMode('chat');
+          addLog('info', 'Начат новый диалог');
+        }
+      }
+    } catch (e) {
+      addLog('error', `Ошибка создания диалога: ${e.message}`);
+    }
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-      {/* Шапка */}
+    <div className="figma-app-canvas">
+      {/* Плавающая шапка Figma */}
       <Header
         status={status}
         quotas={quotas}
@@ -483,17 +530,18 @@ function AppContent() {
         onOpenMemory={() => setMemoryOpen(true)}
       />
 
-      {/* Основная рабочая область (Split View с поддержкой Resize) */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        {/* Левая панель: Чат или Диалоги с динамической шириной */}
-        <div style={{
-          width: `${chatWidth}px`,
-          minWidth: '280px',
-          maxWidth: '850px',
-          height: '100%',
-          flexShrink: 0,
-          position: 'relative'
-        }}>
+      {/* Основная рабочая область Figma Workspace */}
+      <div className="figma-workspace">
+        {/* Левый сайдбар: Чат или Диалоги */}
+        <div 
+          className="figma-sidebar"
+          style={{
+            width: `${chatWidth}px`,
+            minWidth: '280px',
+            maxWidth: '850px',
+            flexShrink: 0
+          }}
+        >
           {viewMode === 'dialogs' ? (
             <DialogsPanel
               activeSessionId={activeSessionId}
@@ -510,11 +558,16 @@ function AppContent() {
               onCancelPlan={handleCancelPlan}
               onOpenDialogs={() => setViewMode('dialogs')}
               activeSessionTitle={activeSession?.title}
+              activeProvider={activeProvider}
+              onSaveProvider={handleSaveProvider}
+              templatePrompt={templatePrompt}
+              onClearTemplatePrompt={() => setTemplatePrompt('')}
+              onNewChat={handleNewChat}
             />
           )}
         </div>
 
-        {/* Разделитель с изменением ширины (Drag Splitter) */}
+        {/* Разделитель ширины (Drag Splitter) */}
         <div
           className={`chat-resizer ${isDragging ? 'active' : ''}`}
           onMouseDown={startResizing}
@@ -523,16 +576,19 @@ function AppContent() {
           <div className="chat-resizer-line" />
         </div>
 
-        {/* Правая панель: Интерактивный вьюпорт трансляции (flex: 1) */}
-        <div style={{ flex: 1, height: '100%', minWidth: '350px' }}>
+        {/* Правая панель: Интерактивный вьюпорт скринкаста */}
+        <div style={{ flex: 1, height: '100%', minWidth: '350px', overflow: 'hidden' }}>
           <LiveViewport
             screenImage={screenImage}
             isRunning={Boolean(status?.browser?.is_running || status?.browser_running)}
             isStartingSession={isStartingSession}
             currentUrl={status?.browser?.current_url}
             onStartSession={handleStartSession}
+            onStopSession={handleStopSession}
             onSendBrowserInput={handleBrowserInput}
             onRequestScreenshot={handleRequestScreenshot}
+            onOpenTildaModal={() => setTildaModalOpen(true)}
+            onSelectPrompt={(prompt) => setTemplatePrompt(prompt)}
           />
         </div>
       </div>
@@ -541,6 +597,15 @@ function AppContent() {
       <LogDrawer
         logs={logs}
         onClearLogs={() => setLogs([])}
+      />
+
+      {/* Модальное окно ввода логина/пароля Tilda */}
+      <TildaCredentialsModal
+        isOpen={tildaModalOpen}
+        onClose={() => setTildaModalOpen(false)}
+        onSave={handleSaveTildaCredentials}
+        initialEmail={activeSession?.tilda_email || ''}
+        initialPassword={activeSession?.tilda_password || ''}
       />
 
       {/* Модальные окна */}

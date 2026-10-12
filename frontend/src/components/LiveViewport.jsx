@@ -2,12 +2,16 @@ import React, { useState, useRef } from 'react';
 import { 
   Maximize2, 
   Minimize2, 
-  MousePointer, 
   Monitor, 
   Camera, 
   Play, 
+  Square,
   RotateCw, 
   Globe,
+  KeyRound,
+  Layers,
+  Code,
+  ShieldCheck,
   Loader2
 } from 'lucide-react';
 
@@ -17,20 +21,47 @@ export default function LiveViewport({
   isStartingSession,
   currentUrl,
   onStartSession,
+  onStopSession,
   onSendBrowserInput,
-  onRequestScreenshot
+  onRequestScreenshot,
+  onOpenTildaModal,
+  onSelectPrompt
 }) {
-  // Интерактивный режим ВКЛЮЧЕН по умолчанию для мгновенного управления
   const [interactiveMode, setInteractiveMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [orbTilt, setOrbTilt] = useState({ x: 0, y: 0 });
+  const [orbPulse, setOrbPulse] = useState(false);
+  const orbRef = useRef(null);
   const containerRef = useRef(null);
   const imgRef = useRef(null);
   const wheelAccumulatorRef = useRef({ deltaX: 0, deltaY: 0, x: 960, y: 540 });
   const wheelRafRef = useRef(null);
   const isDraggingRef = useRef(false);
 
-  // Вычисление точных координат курсора, нормализованных под Viewport Chromium 1920x1080
+  const handleOrbMouseMove = (e) => {
+    if (!orbRef.current) return;
+    const rect = orbRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = (e.clientX - centerX) / (rect.width / 2);
+    const dy = (e.clientY - centerY) / (rect.height / 2);
+    setOrbTilt({
+      x: Math.max(-1, Math.min(1, dx)) * 14,
+      y: Math.max(-1, Math.min(1, dy)) * -14
+    });
+  };
+
+  const handleOrbMouseLeave = () => {
+    setOrbTilt({ x: 0, y: 0 });
+  };
+
+  const handleOrbClick = () => {
+    setOrbPulse(true);
+    setTimeout(() => setOrbPulse(false), 500);
+  };
+
+  // Вычисление точных координат курсора (1920x1080)
   const getNormalizedCoords = (e) => {
     if (!imgRef.current) return { x: 960, y: 540 };
     const rect = imgRef.current.getBoundingClientRect();
@@ -46,22 +77,13 @@ export default function LiveViewport({
     };
   };
 
-  // Обработка клика по трансляции
   const handleImageClick = (e) => {
     if (!interactiveMode || !isRunning || !imgRef.current) return;
-
     const { x, y } = getNormalizedCoords(e);
     const button = e.button === 2 ? 'right' : e.button === 1 ? 'middle' : 'left';
-
-    onSendBrowserInput({
-      event: 'click',
-      x,
-      y,
-      button
-    });
+    onSendBrowserInput({ event: 'click', x, y, button });
   };
 
-  // Обработка скролла колесом мыши с троттлингом и накоплением смещения (батчинг)
   const handleWheel = (e) => {
     if (!isRunning) return;
     e.preventDefault();
@@ -84,178 +106,168 @@ export default function LiveViewport({
         wheelRafRef.current = null;
 
         if (dx !== 0 || dy !== 0) {
-          onSendBrowserInput({
-            event: 'wheel',
-            x: curX,
-            y: curY,
-            deltaX: dx,
-            deltaY: dy
-          });
+          onSendBrowserInput({ event: 'wheel', x: curX, y: curY, deltaX: dx, deltaY: dy });
         }
       }, 30);
     }
   };
 
-  // Поддержка перетаскивания (драга ползунка скроллбара и выделения)
   const handleMouseDown = (e) => {
     if (!interactiveMode || !isRunning) return;
     isDraggingRef.current = true;
     const { x, y } = getNormalizedCoords(e);
-    const button = e.button === 2 ? 'right' : e.button === 1 ? 'middle' : 'left';
-    onSendBrowserInput({
-      event: 'mousedown',
-      x,
-      y,
-      button
-    });
+    onSendBrowserInput({ event: 'mousedown', x, y, button: 'left' });
   };
 
   const handleMouseMove = (e) => {
     if (!interactiveMode || !isRunning || !isDraggingRef.current) return;
     const { x, y } = getNormalizedCoords(e);
-    onSendBrowserInput({
-      event: 'mousemove',
-      x,
-      y
-    });
+    onSendBrowserInput({ event: 'mousemove', x, y });
   };
 
   const handleMouseUp = (e) => {
     if (!interactiveMode || !isRunning) return;
-    if (isDraggingRef.current) {
-      isDraggingRef.current = false;
-      const { x, y } = getNormalizedCoords(e);
-      const button = e.button === 2 ? 'right' : e.button === 1 ? 'middle' : 'left';
-      onSendBrowserInput({
-        event: 'mouseup',
-        x,
-        y,
-        button
-      });
-    }
+    isDraggingRef.current = false;
+    const { x, y } = getNormalizedCoords(e);
+    onSendBrowserInput({ event: 'mouseup', x, y, button: 'left' });
   };
 
   const handleManualRefresh = () => {
     setIsRefreshing(true);
-    onRequestScreenshot();
-    setTimeout(() => setIsRefreshing(false), 600);
+    onRequestScreenshot?.();
+    setTimeout(() => setIsRefreshing(false), 800);
   };
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.();
-      setIsFullscreen(true);
+    if (!isFullscreen) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen();
+      }
     } else {
-      document.exitFullscreen?.();
-      setIsFullscreen(false);
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
     }
+    setIsFullscreen(!isFullscreen);
   };
+
+  const hasStream = Boolean(isRunning || screenImage);
 
   return (
     <div 
-      ref={containerRef}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        background: 'var(--bg-base)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
+      ref={containerRef} 
+      className="figma-main-card"
+      style={{ height: '100%' }}
     >
-      {/* Тулбар вьюпорта */}
-      <div style={{
-        height: '44px',
-        padding: '0 16px',
-        borderBottom: '1px solid var(--border-subtle)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'rgba(17, 23, 38, 0.4)',
-        zIndex: 10,
-        flexShrink: 0
-      }}>
-        {/* Левая часть: Статус стрима и URL */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-          <Monitor size={16} color="var(--text-muted)" />
-          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
-            Демонстрация mdAgent
-          </span>
+      {/* ────────────────── ФИКСИРОВАННАЯ ШАПКА СКРИНКАСТА ────────────────── */}
+      <div className="screencast-top-bar">
+        <div className="screencast-left-actions">
+          {/* Кнопка 1: Аккаунт Tilda */}
+          <button
+            type="button"
+            className="screencast-tilda-btn"
+            onClick={onOpenTildaModal}
+            title="Ввести логин и пароль от Tilda"
+          >
+            <KeyRound size={15} color="#7C3AED" />
+            <span>Аккаунт Tilda</span>
+          </button>
 
-          {isRunning && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '2px 8px',
-              borderRadius: 'var(--radius-full)',
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              fontSize: '11px',
-              fontWeight: '600',
-              color: '#34d399',
-              flexShrink: 0
-            }}>
-              <span className="live-dot" />
-              CDP LIVE
-            </div>
-          )}
+          {/* Кнопка 2: Окно браузера */}
+          <button
+            type="button"
+            className={`screencast-window-btn ${isRunning ? 'active' : ''}`}
+            title={isRunning ? 'Браузер Chromium активен' : 'Браузер ожидает запуска'}
+          >
+            <Monitor size={15} />
+            <span>Окно браузера</span>
+            <span className={`screencast-status-badge ${isRunning ? 'live' : 'idle'}`}>
+              {isStartingSession ? 'Запуск...' : isRunning ? 'Live' : 'Готов'}
+            </span>
+          </button>
 
+          {/* URL текущей страницы */}
           {currentUrl && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
+              gap: '6px',
               fontSize: '11px',
-              color: 'var(--text-faint)',
+              color: '#6B7280',
+              background: '#F9FAFB',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              maxWidth: '320px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              maxWidth: '360px'
+              whiteSpace: 'nowrap'
             }}>
-              <Globe size={11} />
+              <Globe size={13} color="#9CA3AF" />
               <span>{currentUrl}</span>
             </div>
           )}
         </div>
 
-        {/* Правая часть: Управление интерактивом и скриншотом */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        {/* Действия справа */}
+        <div className="screencast-right-actions">
           {isRunning && (
             <>
-              {/* Переключатель Интерактивного режима */}
               <button
-                onClick={() => setInteractiveMode(!interactiveMode)}
-                className={`btn ${interactiveMode ? 'btn-primary' : ''}`}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  background: interactiveMode ? 'var(--accent-primary)' : 'var(--bg-surface)'
-                }}
-                title={interactiveMode ? 'Интерактивное управление активно: кликайте прямо по экрану' : 'Включить клики'}
-              >
-                <MousePointer size={13} />
-                {interactiveMode ? 'Интерактив ON' : 'Интерактив'}
-              </button>
-
-              {/* Обновить снимок экрана */}
-              <button
+                type="button"
+                className="screencast-icon-btn"
                 onClick={handleManualRefresh}
-                className="btn btn-icon"
-                style={{ padding: '6px' }}
-                title="Обновить снимок экрана"
+                title="Обновить кадр"
               >
-                <RotateCw size={14} style={{ animation: isRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
+                <RotateCw size={14} className={isRefreshing ? 'spin' : ''} />
+              </button>
+              <button
+                type="button"
+                className="screencast-icon-btn"
+                onClick={onRequestScreenshot}
+                title="Сделать снимок экрана"
+              >
+                <Camera size={14} />
               </button>
             </>
           )}
 
-          {/* Полноэкранный режим */}
+          {/* Старт / Стоп браузера */}
+          {!isRunning ? (
+            <button
+              type="button"
+              className="screencast-start-btn"
+              onClick={onStartSession}
+              disabled={isStartingSession}
+            >
+              {isStartingSession ? (
+                <>
+                  <Loader2 size={13} className="spin" />
+                  <span>Запуск...</span>
+                </>
+              ) : (
+                <>
+                  <Play size={13} fill="#fff" />
+                  <span>Запустить Chromium</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="screencast-tilda-btn"
+              onClick={onStopSession}
+              style={{ color: '#EF4444', borderColor: '#FCA5A5' }}
+            >
+              <Square size={13} fill="#EF4444" />
+              <span>Остановить</span>
+            </button>
+          )}
+
           <button
+            type="button"
+            className="screencast-icon-btn"
             onClick={toggleFullscreen}
-            className="btn btn-icon"
-            style={{ padding: '6px' }}
             title={isFullscreen ? 'Выйти из полноэкранного режима' : 'На весь экран'}
           >
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -263,103 +275,129 @@ export default function LiveViewport({
         </div>
       </div>
 
-      {/* Экран стрима (жестко зафиксированный без дерганий и скачков) */}
-      <div 
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          overflow: 'hidden',
-          background: 'radial-gradient(circle at 50% 50%, #151b2e 0%, #0a0d14 100%)',
-          position: 'relative'
-        }}
-        onWheel={handleWheel}
-      >
-        {screenImage ? (
-          <div className="stream-screen-container">
-            <div className={`stream-screen-box ${interactiveMode ? 'interactive' : ''}`}>
-              <img
-                ref={imgRef}
-                src={screenImage}
-                alt="mdAgent Screen"
-                onClick={handleImageClick}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onDragStart={(e) => e.preventDefault()}
-                style={{
-                  cursor: interactiveMode ? 'pointer' : 'default',
-                }}
-              />
+      {/* ────────────────── ОСНОВНОЙ КОНТЕНТ ────────────────── */}
+      {hasStream ? (
+        /* РЕЖИМ АКТИВНОЙ ТРАНСЛЯЦИИ CHROMIUM */
+        <div 
+          className="figma-screencast-stream-area"
+          onWheel={handleWheel}
+        >
+          {screenImage ? (
+            <div className="stream-screen-container">
+              <div className="stream-screen-box">
+                <img
+                  ref={imgRef}
+                  src={screenImage}
+                  alt="mdAgent Screen"
+                  onClick={handleImageClick}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onDragStart={(e) => e.preventDefault()}
+                  style={{
+                    cursor: interactiveMode ? 'pointer' : 'default',
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: '#9CA3AF', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <Loader2 size={28} className="spin" color="#8B5CF6" />
+              <div style={{ fontSize: '13px' }}>Подключение к видеотрансляции Chromium...</div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* РЕЖИМ ПОКОЯ (FIGMA WELCOME VIEW: 3D ORB & 3 FEATURES) */
+        <div className="figma-welcome-view">
+          {/* Интерактивная живая 3D-сфера со свечением и тенью */}
+          <div 
+            ref={orbRef}
+            className="orb-stage"
+            onMouseMove={handleOrbMouseMove}
+            onMouseLeave={handleOrbMouseLeave}
+            onClick={handleOrbClick}
+            title="Интеллектуальное ядро mdAgent (кликните для светового импульса)"
+          >
+            {/* Ореол свечения (Aura Bloom) */}
+            <div className="orb-aura-glow" />
+
+            {/* Орбитальное световое кольцо энергии */}
+            <div className="orb-energy-ring" />
+
+            {/* Живая сфера с 3D-наклоном и динамическим смещением блика */}
+            <div 
+              className="purple-orb-3d"
+              style={{
+                transform: `perspective(600px) rotateX(${orbTilt.y}deg) rotateY(${orbTilt.x}deg) scale(${orbPulse ? 1.12 : 1})`,
+                background: `radial-gradient(circle at ${32 + orbTilt.x * 0.5}% ${28 - orbTilt.y * 0.5}%, #FFFFFF 0%, #E9D5FF 28%, #A855F7 62%, #6D28D9 86%, #4C1D95 100%)`
+              }}
+            />
+
+            {/* Контактная тень под сферой */}
+            <div className="orb-contact-shadow" />
+          </div>
+
+          {/* Приветствие */}
+          <div className="welcome-greeting-title">
+            mdAgent
+          </div>
+          <div className="welcome-greeting-heading">
+            Интеллектуальная автоматизация сайтов на Tilda
+          </div>
+
+          {/* 3 карточки возможностей */}
+          <div className="welcome-cards-grid">
+            {/* Карточка 1 */}
+            <div 
+              className="welcome-feature-card"
+              onClick={() => onSelectPrompt?.('Зайди на страницу карточка товара, настрой стили под минимализм')}
+            >
+              <div className="welcome-card-icon-box">
+                <Layers size={20} />
+              </div>
+              <div className="welcome-card-title">
+                Автоматизация в админке
+              </div>
+              <div className="welcome-card-desc">
+                Навигация по проектам, поиск страниц, добавление блоков из каталога и редактирование параметров по текстовым командам.
+              </div>
+            </div>
+
+            {/* Карточка 2 */}
+            <div 
+              className="welcome-feature-card"
+              onClick={() => onSelectPrompt?.('Стилизуй карточку товара под гласоморфизм, замени выпадающие селекты вариантов на кликабельные кнопки')}
+            >
+              <div className="welcome-card-icon-box">
+                <Code size={20} />
+              </div>
+              <div className="welcome-card-title">
+                Кастомизация и код T123
+              </div>
+              <div className="welcome-card-desc">
+                Стилизация карточек под минимализм и гласоморфизм, замена селектов на кнопки, генерация адаптивного CSS и JS.
+              </div>
+            </div>
+
+            {/* Карточка 3 */}
+            <div 
+              className="welcome-feature-card"
+              onClick={() => onSelectPrompt?.('Создай стандартный блок попап формы BF502 и проверь работу на опубликованном сайте')}
+            >
+              <div className="welcome-card-icon-box">
+                <ShieldCheck size={20} />
+              </div>
+              <div className="welcome-card-title">
+                Closed-Loop верификация
+              </div>
+              <div className="welcome-card-desc">
+                Автономная проверка боевого сайта на второй вкладке, валидация верстки в DOM и устранение ошибок без ложных рапортов.
+              </div>
             </div>
           </div>
-        ) : (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-muted)',
-            textAlign: 'center',
-            maxWidth: '360px'
-          }}>
-            <div style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '16px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid var(--border-subtle)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '16px'
-            }}>
-              <Monitor size={28} color="var(--text-faint)" />
-            </div>
-            <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '6px' }}>
-              {isStartingSession 
-                ? 'Запуск Chromium...' 
-                : isRunning 
-                  ? 'Ожидание видеопотока...' 
-                  : 'Браузер не запущен'}
-            </div>
-            <div style={{ fontSize: '12px', lineHeight: '1.5', marginBottom: '18px' }}>
-              {isStartingSession
-                ? 'Инициализация браузера и подключение к сессии Tilda...'
-                : isRunning 
-                  ? 'Подключение к экрану Chromium...' 
-                  : 'Запустите сессию Chromium, чтобы наблюдать за работой агента в реальном времени и управлять сайтом.'}
-            </div>
-            {!isRunning ? (
-              <button 
-                className="btn btn-primary" 
-                onClick={onStartSession}
-                disabled={isStartingSession}
-                style={isStartingSession ? { opacity: 0.75, cursor: 'not-allowed' } : {}}
-              >
-                {isStartingSession ? (
-                  <>
-                    <Loader2 size={14} className="spin" />
-                    Запуск сессии...
-                  </>
-                ) : (
-                  <>
-                    <Play size={14} />
-                    Запустить сессию
-                  </>
-                )}
-              </button>
-            ) : (
-              <button className="btn" onClick={handleManualRefresh}>
-                <RotateCw size={14} />
-                Запросить кадр
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
